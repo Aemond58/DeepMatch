@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/user_input.dart';
@@ -160,6 +159,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     _loadRealProfiles();
+    _loadMatches();
   }
 
   Future<void> _loadRealProfiles() async {
@@ -168,6 +168,19 @@ class _MainScreenState extends State<MainScreen> {
       if (mounted) {
         setState(() {
           _realProfiles = profiles;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadMatches() async {
+    try {
+      final matches = await SupabaseService.loadMatches();
+      if (mounted) {
+        setState(() {
+          _matches
+            ..clear()
+            ..addAll(matches);
         });
       }
     } catch (_) {}
@@ -212,6 +225,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     final localUser = UserInput(
+      id: supabase.auth.currentUser?.id,
       name: user.name,
       age: user.age,
       city: user.city,
@@ -261,7 +275,7 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _onLike() {
+  Future<void> _onLike() async {
     final profiles = _filteredProfiles;
     if (_profileIndex >= profiles.length) return;
     final profile = profiles[_profileIndex];
@@ -274,7 +288,16 @@ class _MainScreenState extends State<MainScreen> {
       _profileIndex++;
     });
 
-    if (Random().nextBool()) {
+    if (profile.id == null) return;
+
+    bool isMatch = false;
+    try {
+      isMatch = await SupabaseService.likeUser(profile.id!);
+    } catch (_) {
+      return;
+    }
+
+    if (isMatch && mounted) {
       final match = Match(user: profile, matchedAt: DateTime.now());
       setState(() {
         _matches.add(match);
@@ -282,7 +305,7 @@ class _MainScreenState extends State<MainScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('💜 Это match! ${profile.name} тоже лайкнула тебя'),
+          content: Text('💜 Это match! Вы с ${profile.name} понравились друг другу'),
           backgroundColor: const Color(0xFF534AB7),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 5),

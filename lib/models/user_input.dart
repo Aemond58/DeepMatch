@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 class UserInput {
+  final String? id;
   final String name;
   final int age;
   final String city;
@@ -19,6 +20,7 @@ class UserInput {
   final List<String> assetPhotoPaths;
 
   UserInput({
+    this.id,
     required this.name,
     required this.age,
     required this.city,
@@ -56,6 +58,7 @@ class UserInput {
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'name': name,
         'age': age,
         'city': city,
@@ -73,7 +76,6 @@ class UserInput {
       };
 
   factory UserInput.fromJson(Map<String, dynamic> json) {
-    // Backward compat: old single-photo format
     List<Uint8List> photos = [];
     if (json['photos'] != null) {
       photos = (json['photos'] as List<dynamic>)
@@ -91,6 +93,7 @@ class UserInput {
     }
 
     return UserInput(
+      id: json['id'],
       name: json['name'],
       age: json['age'],
       city: json['city'],

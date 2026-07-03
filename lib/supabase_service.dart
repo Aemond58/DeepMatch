@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'models/user_input.dart';
+import 'models/match.dart';
 import 'supabase_config.dart';
 
 class SupabaseService {
@@ -11,33 +10,20 @@ class SupabaseService {
     final user = supabase.auth.currentUser;
     if (user == null) throw Exception('Пользователь не авторизован');
 
-    final session = supabase.auth.currentSession;
-    if (session == null) throw Exception('Нет сессии');
-
     final List<String> urls = [];
     final timestamp = DateTime.now().millisecondsSinceEpoch;
 
     for (int i = 0; i < photos.length; i++) {
       final path = '${user.id}/${timestamp}_$i.jpg';
-      final base64Data = base64Encode(photos[i]);
 
-      final response = await http.post(
-        Uri.parse('$supabaseUrl/storage/v1/object/avatars/$path'),
-        headers: {
-          'Authorization': 'Bearer ${session.accessToken}',
-          'apikey': supabaseAnonKey,
-          'Content-Type': 'application/json',
-          'x-upsert': 'true',
-        },
-        body: jsonEncode({
-          'data': base64Data,
-          'mimeType': 'image/jpeg',
-        }),
-      );
-
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Ошибка загрузки фото: ${response.body}');
-      }
+      await supabase.storage.from('avatars').uploadBinary(
+            path,
+            photos[i],
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
 
       final url = supabase.storage.from('avatars').getPublicUrl(path);
       urls.add(url);
@@ -100,8 +86,64 @@ class SupabaseService {
         .toList();
   }
 
+  static Future<bool> likeUser(String toProfileId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Пользователь не авторизован');
+
+    await supabase.from('likes').upsert({
+      'from_user_id': currentUser.id,
+      'to_user_id': toProfileId,
+    }, onConflict: 'from_user_id,to_user_id');
+
+    final reverse = await supabase
+        .from('likes')
+        .select()
+        .eq('from_user_id', toProfileId)
+        .eq('to_user_id', currentUser.id)
+        .maybeSingle();
+
+    if (reverse == null) return false;
+
+    final ids = [currentUser.id, toProfileId]..sort();
+    await supabase.from('matches').upsert({
+      'user_a': ids[0],
+      'user_b': ids[1],
+    }, onConflict: 'user_a,user_b');
+
+    return true;
+  }
+
+  static Future<List<Match>> loadMatches() async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) return [];
+
+    final data = await supabase
+        .from('matches')
+        .select()
+        .or('user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}');
+
+    final List<Match> matches = [];
+    for (final row in data as List) {
+      final otherId =
+          row['user_a'] == currentUser.id ? row['user_b'] : row['user_a'];
+      final profileRow = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', otherId)
+          .maybeSingle();
+      if (profileRow != null) {
+        matches.add(Match(
+          user: _profileFromRow(profileRow),
+          matchedAt: DateTime.parse(row['matched_at']),
+        ));
+      }
+    }
+    return matches;
+  }
+
   static UserInput _profileFromRow(Map<String, dynamic> row) {
     return UserInput(
+      id: row['id'],
       name: row['name'] ?? '',
       age: row['age'] ?? 0,
       city: row['city'] ?? '',
