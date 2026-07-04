@@ -1,14 +1,13 @@
-import 'user_input.dart';
-import 'dart:typed_data';
-
 import '../models/user_input.dart';
 
 class Match {
+  final String id;
   final UserInput user;
   final DateTime matchedAt;
-  final List<ChatMessage> messages;
+  List<ChatMessage> messages;
 
   Match({
+    required this.id,
     required this.user,
     required this.matchedAt,
     List<ChatMessage>? messages,

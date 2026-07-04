@@ -290,15 +290,15 @@ class _MainScreenState extends State<MainScreen> {
 
     if (profile.id == null) return;
 
-    bool isMatch = false;
+    String? matchId;
     try {
-      isMatch = await SupabaseService.likeUser(profile.id!);
+      matchId = await SupabaseService.likeUser(profile.id!);
     } catch (_) {
       return;
     }
 
-    if (isMatch && mounted) {
-      final match = Match(user: profile, matchedAt: DateTime.now());
+    if (matchId != null && mounted) {
+      final match = Match(id: matchId, user: profile, matchedAt: DateTime.now());
       setState(() {
         _matches.add(match);
         _unreadMatches++;
@@ -343,10 +343,6 @@ class _MainScreenState extends State<MainScreen> {
         liked: true,
       );
     });
-  }
-
-  void _onSendMessage(Match match, String text) {
-    setState(() {});
   }
 
   void _openFilters(BuildContext context) {
@@ -475,7 +471,7 @@ class _MainScreenState extends State<MainScreen> {
     final tabs = [
       exploreTab,
       HistoryScreen(history: _history, onLike: _onHistoryLike),
-      ChatsScreen(matches: _matches, onSend: _onSendMessage),
+      ChatsScreen(matches: _matches),
       MyProfileScreen(
         user: _currentUser!,
         onEdit: () => Navigator.push(

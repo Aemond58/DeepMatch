@@ -5,9 +5,8 @@ import 'chat_detail_screen.dart';
 
 class ChatsScreen extends StatelessWidget {
   final List<Match> matches;
-  final Function(Match, String) onSend;
 
-  const ChatsScreen({super.key, required this.matches, required this.onSend});
+  const ChatsScreen({super.key, required this.matches});
 
   @override
   Widget build(BuildContext context) {
@@ -34,10 +33,7 @@ class ChatsScreen extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ChatDetailScreen(
-                        match: match,
-                        onSend: (text) => onSend(match, text),
-                      ),
+                      builder: (_) => ChatDetailScreen(match: match),
                     ),
                   ),
                   child: Container(

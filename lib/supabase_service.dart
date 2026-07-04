@@ -86,7 +86,9 @@ class SupabaseService {
         .toList();
   }
 
-  static Future<bool> likeUser(String toProfileId) async {
+  /// Лайкает пользователя/бота с указанным id (profiles.id).
+  /// Возвращает id матча, если возник взаимный match, иначе null.
+  static Future<String?> likeUser(String toProfileId) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) throw Exception('Пользователь не авторизован');
 
@@ -102,17 +104,22 @@ class SupabaseService {
         .eq('to_user_id', currentUser.id)
         .maybeSingle();
 
-    if (reverse == null) return false;
+    if (reverse == null) return null;
 
     final ids = [currentUser.id, toProfileId]..sort();
-    await supabase.from('matches').upsert({
-      'user_a': ids[0],
-      'user_b': ids[1],
-    }, onConflict: 'user_a,user_b');
+    final matchRow = await supabase
+        .from('matches')
+        .upsert({
+          'user_a': ids[0],
+          'user_b': ids[1],
+        }, onConflict: 'user_a,user_b')
+        .select()
+        .single();
 
-    return true;
+    return matchRow['id'] as String;
   }
 
+  /// Загружает все подтверждённые мэтчи текущего пользователя.
   static Future<List<Match>> loadMatches() async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) return [];
@@ -133,12 +140,77 @@ class SupabaseService {
           .maybeSingle();
       if (profileRow != null) {
         matches.add(Match(
+          id: row['id'],
           user: _profileFromRow(profileRow),
           matchedAt: DateTime.parse(row['matched_at']),
         ));
       }
     }
     return matches;
+  }
+
+  /// Загружает историю сообщений конкретного матча.
+  static Future<List<ChatMessage>> loadMessages(String matchId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) return [];
+
+    final data = await supabase
+        .from('messages')
+        .select()
+        .eq('match_id', matchId)
+        .order('sent_at');
+
+    return (data as List).map((row) {
+      return ChatMessage(
+        text: row['text'],
+        isMe: row['sender_id'] == currentUser.id,
+        sentAt: DateTime.parse(row['sent_at']),
+      );
+    }).toList();
+  }
+
+  /// Отправляет сообщение в конкретном матче.
+  static Future<void> sendMessage(String matchId, String text) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Пользователь не авторизован');
+
+    await supabase.from('messages').insert({
+      'match_id': matchId,
+      'sender_id': currentUser.id,
+      'text': text,
+    });
+  }
+
+  /// Подписка на новые сообщения в реальном времени для конкретного матча.
+  static RealtimeChannel subscribeToMessages(
+    String matchId,
+    void Function(ChatMessage) onNewMessage,
+  ) {
+    final currentUser = supabase.auth.currentUser;
+
+    final channel = supabase
+        .channel('messages:$matchId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'match_id',
+            value: matchId,
+          ),
+          callback: (payload) {
+            final row = payload.newRecord;
+            onNewMessage(ChatMessage(
+              text: row['text'],
+              isMe: row['sender_id'] == currentUser?.id,
+              sentAt: DateTime.parse(row['sent_at']),
+            ));
+          },
+        )
+        .subscribe();
+
+    return channel;
   }
 
   static UserInput _profileFromRow(Map<String, dynamic> row) {
