@@ -149,6 +149,45 @@ class SupabaseService {
     return matches;
   }
 
+  /// Подписка на новые матчи текущего пользователя в реальном времени.
+  static RealtimeChannel subscribeToNewMatches(
+    void Function(Match) onNewMatch,
+  ) {
+    final currentUser = supabase.auth.currentUser;
+
+    final channel = supabase
+        .channel('matches-listener-${currentUser?.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'matches',
+          callback: (payload) async {
+            final row = payload.newRecord;
+            if (row['user_a'] != currentUser?.id &&
+                row['user_b'] != currentUser?.id) {
+              return;
+            }
+            final otherId =
+                row['user_a'] == currentUser?.id ? row['user_b'] : row['user_a'];
+            final profileRow = await supabase
+                .from('profiles')
+                .select()
+                .eq('id', otherId)
+                .maybeSingle();
+            if (profileRow != null) {
+              onNewMatch(Match(
+                id: row['id'],
+                user: _profileFromRow(profileRow),
+                matchedAt: DateTime.parse(row['matched_at']),
+              ));
+            }
+          },
+        )
+        .subscribe();
+
+    return channel;
+  }
+
   /// Загружает историю сообщений конкретного матча.
   static Future<List<ChatMessage>> loadMessages(String matchId) async {
     final currentUser = supabase.auth.currentUser;

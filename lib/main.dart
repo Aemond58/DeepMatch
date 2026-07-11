@@ -59,6 +59,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Match> _matches = [];
   int _unreadMatches = 0;
   FilterData _filterData = FilterData();
+  dynamic _matchesChannel;
 
   List<UserInput> _realProfiles = [];
 
@@ -100,6 +101,12 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _init();
+  }
+
+  @override
+  void dispose() {
+    _matchesChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -160,6 +167,7 @@ class _MainScreenState extends State<MainScreen> {
 
     _loadRealProfiles();
     _loadMatches();
+    _subscribeToMatches();
   }
 
   Future<void> _loadRealProfiles() async {
@@ -184,6 +192,31 @@ class _MainScreenState extends State<MainScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  void _subscribeToMatches() {
+    _matchesChannel = SupabaseService.subscribeToNewMatches((match) {
+      if (!mounted) return;
+      if (_matches.any((m) => m.id == match.id)) return;
+      setState(() {
+        _matches.add(match);
+        _unreadMatches++;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('💜 Это match! Вы с ${match.user.name} понравились друг другу'),
+          backgroundColor: const Color(0xFF534AB7),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          action: SnackBarAction(
+            label: 'Написать',
+            textColor: Colors.white,
+            onPressed: () => setState(() => _currentTab = 2),
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _saveUser(UserInput user) async {
@@ -261,6 +294,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _logout() async {
+    _matchesChannel?.unsubscribe();
     await supabase.auth.signOut();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('current_user');
@@ -298,6 +332,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     if (matchId != null && mounted) {
+      if (_matches.any((m) => m.id == matchId)) return;
       final match = Match(id: matchId, user: profile, matchedAt: DateTime.now());
       setState(() {
         _matches.add(match);
