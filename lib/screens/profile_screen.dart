@@ -4,18 +4,20 @@ import '../theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserInput user;
-  final VoidCallback onLike;
-  final VoidCallback onPass;
-  final VoidCallback onSuperLike;
+  final VoidCallback? onLike;
+  final VoidCallback? onPass;
+  final VoidCallback? onSuperLike;
   final Function(int)? onRate;
+  final bool readOnly;
 
   const ProfileScreen({
     super.key,
     required this.user,
-    required this.onLike,
-    required this.onPass,
-    required this.onSuperLike,
+    this.onLike,
+    this.onPass,
+    this.onSuperLike,
     this.onRate,
+    this.readOnly = false,
   });
 
   @override
@@ -269,11 +271,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return const Color(0xFF1D9E75);
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     final user = widget.user;
     return Scaffold(
       backgroundColor: AppColors.bg,
+      appBar: widget.readOnly
+          ? AppBar(
+              backgroundColor: AppColors.surface,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Text(user.name,
+                  style: const TextStyle(
+                      color: AppColors.textPrimary, fontSize: 17, fontWeight: FontWeight.w500)),
+            )
+          : null,
       body: Column(
         children: [
           Expanded(
@@ -302,36 +317,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-          _buildRatingBar(),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+          if (!widget.readOnly) _buildRatingBar(),
+          if (!widget.readOnly)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _ActionButton(
+                      icon: Icons.close,
+                      color: AppColors.dislike,
+                      size: 52,
+                      onTap: widget.onPass ?? () {}),
+                  _ActionButton(
+                      icon: Icons.favorite,
+                      color: Colors.white,
+                      backgroundColor: AppColors.primary,
+                      size: 64,
+                      onTap: widget.onLike ?? () {},
+                      glow: true),
+                  _ActionButton(
+                      icon: Icons.star,
+                      color: AppColors.superlike,
+                      size: 52,
+                      onTap: widget.onSuperLike ?? () {}),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _ActionButton(
-                    icon: Icons.close,
-                    color: AppColors.dislike,
-                    size: 52,
-                    onTap: widget.onPass),
-                _ActionButton(
-                    icon: Icons.favorite,
-                    color: Colors.white,
-                    backgroundColor: AppColors.primary,
-                    size: 64,
-                    onTap: widget.onLike,
-                    glow: true),
-                _ActionButton(
-                    icon: Icons.star,
-                    color: AppColors.superlike,
-                    size: 52,
-                    onTap: widget.onSuperLike),
-              ],
-            ),
-          ),
         ],
       ),
     );

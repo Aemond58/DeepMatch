@@ -15,12 +15,14 @@ class Match {
 }
 
 class ChatMessage {
-  final String text;
+  final String? text;
+  final String? imageUrl;
   final bool isMe;
   final DateTime sentAt;
 
   ChatMessage({
-    required this.text,
+    this.text,
+    this.imageUrl,
     required this.isMe,
     required this.sentAt,
   });

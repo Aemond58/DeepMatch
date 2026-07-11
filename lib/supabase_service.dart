@@ -32,6 +32,26 @@ class SupabaseService {
     return urls;
   }
 
+  /// Загружает одну картинку для сообщения в чате, возвращает публичный URL.
+  static Future<String> uploadChatImage(Uint8List bytes, String matchId) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('Пользователь не авторизован');
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final path = '$matchId/${user.id}_$timestamp.jpg';
+
+    await supabase.storage.from('chat-images').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(
+            contentType: 'image/jpeg',
+            upsert: true,
+          ),
+        );
+
+    return supabase.storage.from('chat-images').getPublicUrl(path);
+  }
+
   static Future<void> saveProfile(UserInput user, List<String> photoUrls) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) throw Exception('Пользователь не авторизован');
@@ -86,8 +106,6 @@ class SupabaseService {
         .toList();
   }
 
-  /// Лайкает пользователя/бота с указанным id (profiles.id).
-  /// Возвращает id матча, если возник взаимный match, иначе null.
   static Future<String?> likeUser(String toProfileId) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) throw Exception('Пользователь не авторизован');
@@ -119,7 +137,6 @@ class SupabaseService {
     return matchRow['id'] as String;
   }
 
-  /// Загружает все подтверждённые мэтчи текущего пользователя.
   static Future<List<Match>> loadMatches() async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) return [];
@@ -149,7 +166,6 @@ class SupabaseService {
     return matches;
   }
 
-  /// Подписка на новые матчи текущего пользователя в реальном времени.
   static RealtimeChannel subscribeToNewMatches(
     void Function(Match) onNewMatch,
   ) {
@@ -188,7 +204,6 @@ class SupabaseService {
     return channel;
   }
 
-  /// Загружает историю сообщений конкретного матча.
   static Future<List<ChatMessage>> loadMessages(String matchId) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) return [];
@@ -202,13 +217,14 @@ class SupabaseService {
     return (data as List).map((row) {
       return ChatMessage(
         text: row['text'],
+        imageUrl: row['image_url'],
         isMe: row['sender_id'] == currentUser.id,
         sentAt: DateTime.parse(row['sent_at']),
       );
     }).toList();
   }
 
-  /// Отправляет сообщение в конкретном матче.
+  /// Отправляет текстовое сообщение в конкретном матче.
   static Future<void> sendMessage(String matchId, String text) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) throw Exception('Пользователь не авторизован');
@@ -220,7 +236,20 @@ class SupabaseService {
     });
   }
 
-  /// Подписка на новые сообщения в реальном времени для конкретного матча.
+  /// Отправляет фото в конкретном матче.
+  static Future<void> sendImageMessage(String matchId, Uint8List bytes) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Пользователь не авторизован');
+
+    final imageUrl = await uploadChatImage(bytes, matchId);
+
+    await supabase.from('messages').insert({
+      'match_id': matchId,
+      'sender_id': currentUser.id,
+      'image_url': imageUrl,
+    });
+  }
+
   static RealtimeChannel subscribeToMessages(
     String matchId,
     void Function(ChatMessage) onNewMessage,
@@ -242,6 +271,7 @@ class SupabaseService {
             final row = payload.newRecord;
             onNewMessage(ChatMessage(
               text: row['text'],
+              imageUrl: row['image_url'],
               isMe: row['sender_id'] == currentUser?.id,
               sentAt: DateTime.parse(row['sent_at']),
             ));
