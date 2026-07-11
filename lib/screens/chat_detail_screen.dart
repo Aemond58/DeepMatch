@@ -22,7 +22,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _loading = true;
-  bool _sendingImage = false;
+  bool _sending = false;
+  Uint8List? _pendingImage;
   dynamic _channel;
 
   @override
@@ -62,68 +63,71 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      });
     });
   }
 
-  Future<void> _send() async {
-    if (_controller.text.trim().isEmpty) return;
-    final text = _controller.text.trim();
-    _controller.clear();
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() => _pendingImage = bytes);
+  }
 
-    setState(() {
-      widget.match.messages.add(ChatMessage(text: text, isMe: true, sentAt: DateTime.now()));
-    });
-    _scrollToBottom();
+  void _cancelPendingImage() {
+    setState(() => _pendingImage = null);
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    final image = _pendingImage;
+
+    if (text.isEmpty && image == null) return;
+
+    _controller.clear();
+    setState(() => _pendingImage = null);
+
+    if (_sending) return;
+    setState(() => _sending = true);
 
     try {
-      await SupabaseService.sendMessage(widget.match.id, text);
+      if (image != null) {
+        final imageUrl = await SupabaseService.uploadChatImage(image, widget.match.id);
+        await SupabaseService.sendMessage(
+          widget.match.id,
+          text.isNotEmpty ? text : null,
+          imageUrl: imageUrl,
+        );
+        setState(() {
+          widget.match.messages.add(ChatMessage(
+            text: text.isNotEmpty ? text : null,
+            imageUrl: imageUrl,
+            isMe: true,
+            sentAt: DateTime.now(),
+          ));
+        });
+      } else {
+        await SupabaseService.sendMessage(widget.match.id, text);
+        setState(() {
+          widget.match.messages.add(ChatMessage(text: text, isMe: true, sentAt: DateTime.now()));
+        });
+      }
+      _scrollToBottom();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Не удалось отправить: $e')),
         );
       }
-    }
-  }
-
-  Future<void> _pickAndSendImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200);
-    if (picked == null) return;
-
-    final bytes = await picked.readAsBytes();
-
-    setState(() => _sendingImage = true);
-    try {
-      await SupabaseService.sendImageMessage(widget.match.id, bytes);
-      // сообщение с фото прилетит нам самим через realtime не придёт (isMe==true игнорируется),
-      // поэтому добавляем локально сразу после успешной отправки
-      setState(() {
-        widget.match.messages.add(ChatMessage(
-          imageUrl: null, // покажем локальный предпросмотр через bytes ниже не требуется — просто перезагрузим историю
-          isMe: true,
-          sentAt: DateTime.now(),
-        ));
-      });
-      // проще и надёжнее — перезагрузить историю, чтобы получить настоящий image_url
-      await _loadHistory();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Не удалось отправить фото: $e')),
-        );
-      }
     } finally {
-      if (mounted) setState(() => _sendingImage = false);
+      if (mounted) setState(() => _sending = false);
     }
   }
 
@@ -285,13 +289,52 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ? Center(
                         child: Text('Напиши первым ${widget.match.user.name} 👋',
                             style: const TextStyle(color: AppColors.textSecondary, fontSize: 15)))
-                    : ListView.builder(
+                  : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
+                        reverse: true,
                         itemCount: msgs.length,
-                        itemBuilder: (_, i) => _buildMessageBubble(msgs[i]),
+                        itemBuilder: (_, i) => _buildMessageBubble(msgs[msgs.length - 1 - i]),
                       ),
           ),
+          if (_pendingImage != null)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              color: AppColors.surface,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.memory(
+                        _pendingImage!,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: -8,
+                      right: -8,
+                      child: GestureDetector(
+                        onTap: _cancelPendingImage,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            color: Colors.black87,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, color: Colors.white, size: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             decoration: const BoxDecoration(
@@ -301,13 +344,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             child: Row(
               children: [
                 IconButton(
-                  onPressed: _sendingImage ? null : _pickAndSendImage,
-                  icon: _sendingImage
-                      ? const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
-                        )
-                      : const Icon(Icons.image_outlined, color: AppColors.primary),
+                  onPressed: _sending ? null : _pickImage,
+                  icon: const Icon(Icons.image_outlined, color: AppColors.primary),
                 ),
                 Expanded(
                   child: TextField(
@@ -327,7 +365,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: _send,
+                  onTap: _sending ? null : _send,
                   child: Container(
                     width: 44, height: 44,
                     decoration: BoxDecoration(
@@ -335,7 +373,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       color: AppColors.primary,
                       boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 10)],
                     ),
-                    child: const Icon(Icons.send, color: Colors.white, size: 20),
+                    child: _sending
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send, color: Colors.white, size: 20),
                   ),
                 ),
               ],

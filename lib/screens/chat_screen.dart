@@ -27,7 +27,11 @@ class ChatsScreen extends StatelessWidget {
               itemCount: matches.length,
               itemBuilder: (_, i) {
                 final match = matches[i];
-                final lastMsg = match.messages.isNotEmpty ? match.messages.last.text : 'Напишите первым!';
+               final lastMsg = match.messages.isEmpty
+                    ? 'Напишите первым!'
+                    : (match.messages.last.imageUrl != null
+                        ? '📷 Фото'
+                        : (match.messages.last.text ?? ''));
                 final hasUnread = match.messages.isNotEmpty && !match.messages.last.isMe;
                 return InkWell(
                   onTap: () => Navigator.push(

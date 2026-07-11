@@ -204,17 +204,16 @@ class SupabaseService {
     return channel;
   }
 
-  static Future<List<ChatMessage>> loadMessages(String matchId) async {
+static Future<List<ChatMessage>> loadMessages(String matchId) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) return [];
 
     final data = await supabase
         .from('messages')
         .select()
-        .eq('match_id', matchId)
-        .order('sent_at');
+        .eq('match_id', matchId);
 
-    return (data as List).map((row) {
+    final messages = (data as List).map((row) {
       return ChatMessage(
         text: row['text'],
         imageUrl: row['image_url'],
@@ -222,31 +221,22 @@ class SupabaseService {
         sentAt: DateTime.parse(row['sent_at']),
       );
     }).toList();
+
+    messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+
+    return messages;
   }
 
-  /// Отправляет текстовое сообщение в конкретном матче.
-  static Future<void> sendMessage(String matchId, String text) async {
+ /// Отправляет сообщение в конкретном матче — текст и/или картинку.
+  static Future<void> sendMessage(String matchId, String? text, {String? imageUrl}) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) throw Exception('Пользователь не авторизован');
 
     await supabase.from('messages').insert({
       'match_id': matchId,
       'sender_id': currentUser.id,
-      'text': text,
-    });
-  }
-
-  /// Отправляет фото в конкретном матче.
-  static Future<void> sendImageMessage(String matchId, Uint8List bytes) async {
-    final currentUser = supabase.auth.currentUser;
-    if (currentUser == null) throw Exception('Пользователь не авторизован');
-
-    final imageUrl = await uploadChatImage(bytes, matchId);
-
-    await supabase.from('messages').insert({
-      'match_id': matchId,
-      'sender_id': currentUser.id,
-      'image_url': imageUrl,
+      if (text != null) 'text': text,
+      if (imageUrl != null) 'image_url': imageUrl,
     });
   }
 
