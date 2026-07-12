@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_input.dart';
 import '../theme.dart';
+import '../supabase_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserInput user;
@@ -28,6 +29,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _photoIndex = 0;
   int? _rating;
   final PageController _pageController = PageController();
+  bool _blocked = false;
+  bool _blockLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.readOnly && widget.user.id != null) {
+      _checkBlocked();
+    }
+  }
+
+  Future<void> _checkBlocked() async {
+    final blocked = await SupabaseService.isBlocked(widget.user.id!);
+    if (mounted) setState(() => _blocked = blocked);
+  }
+
+  Future<void> _toggleBlock() async {
+    if (widget.user.id == null) return;
+    setState(() => _blockLoading = true);
+    try {
+      if (_blocked) {
+        await SupabaseService.unblockUser(widget.user.id!);
+      } else {
+        await SupabaseService.blockUser(widget.user.id!);
+      }
+      if (mounted) setState(() => _blocked = !_blocked);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _blockLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -271,7 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return const Color(0xFF1D9E75);
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     final user = widget.user;
     return Scaffold(
@@ -287,6 +324,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: Text(user.name,
                   style: const TextStyle(
                       color: AppColors.textPrimary, fontSize: 17, fontWeight: FontWeight.w500)),
+              actions: [
+                if (_blockLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: Icon(
+                      _blocked ? Icons.block : Icons.block_outlined,
+                      color: _blocked ? AppColors.dislike : AppColors.textSecondary,
+                    ),
+                    tooltip: _blocked ? 'Разблокировать' : 'Заблокировать',
+                    onPressed: _toggleBlock,
+                  ),
+              ],
             )
           : null,
       body: Column(

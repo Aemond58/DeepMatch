@@ -32,7 +32,6 @@ class SupabaseService {
     return urls;
   }
 
-  /// Загружает одну картинку для сообщения в чате, возвращает публичный URL.
   static Future<String> uploadChatImage(Uint8List bytes, String matchId) async {
     final user = supabase.auth.currentUser;
     if (user == null) throw Exception('Пользователь не авторизован');
@@ -204,7 +203,7 @@ class SupabaseService {
     return channel;
   }
 
-static Future<List<ChatMessage>> loadMessages(String matchId) async {
+  static Future<List<ChatMessage>> loadMessages(String matchId) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) return [];
 
@@ -215,6 +214,7 @@ static Future<List<ChatMessage>> loadMessages(String matchId) async {
 
     final messages = (data as List).map((row) {
       return ChatMessage(
+        id: row['id'],
         text: row['text'],
         imageUrl: row['image_url'],
         isMe: row['sender_id'] == currentUser.id,
@@ -227,22 +227,33 @@ static Future<List<ChatMessage>> loadMessages(String matchId) async {
     return messages;
   }
 
- /// Отправляет сообщение в конкретном матче — текст и/или картинку.
-  static Future<void> sendMessage(String matchId, String? text, {String? imageUrl}) async {
+  /// Отправляет сообщение (текст и/или картинку), возвращает id новой записи.
+  static Future<String> sendMessage(String matchId, String? text, {String? imageUrl}) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) throw Exception('Пользователь не авторизован');
 
-    await supabase.from('messages').insert({
+    final row = await supabase.from('messages').insert({
       'match_id': matchId,
       'sender_id': currentUser.id,
       if (text != null) 'text': text,
       if (imageUrl != null) 'image_url': imageUrl,
-    });
+    }).select().single();
+
+    return row['id'] as String;
+  }
+
+  /// Удаляет своё сообщение (исчезает у обоих сторон сразу).
+  static Future<void> deleteMessage(String messageId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Пользователь не авторизован');
+
+    await supabase.from('messages').delete().eq('id', messageId);
   }
 
   static RealtimeChannel subscribeToMessages(
     String matchId,
     void Function(ChatMessage) onNewMessage,
+    void Function(String) onDeletedMessage,
   ) {
     final currentUser = supabase.auth.currentUser;
 
@@ -260,6 +271,7 @@ static Future<List<ChatMessage>> loadMessages(String matchId) async {
           callback: (payload) {
             final row = payload.newRecord;
             onNewMessage(ChatMessage(
+              id: row['id'],
               text: row['text'],
               imageUrl: row['image_url'],
               isMe: row['sender_id'] == currentUser?.id,
@@ -267,9 +279,57 @@ static Future<List<ChatMessage>> loadMessages(String matchId) async {
             ));
           },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'messages',
+          callback: (payload) {
+            final row = payload.oldRecord;
+            final id = row['id'];
+            if (id != null) onDeletedMessage(id as String);
+          },
+        )
         .subscribe();
 
     return channel;
+  }
+
+  /// Блокирует пользователя/бота — он больше не сможет тебе писать.
+  static Future<void> blockUser(String blockedProfileId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Пользователь не авторизован');
+
+    await supabase.from('blocks').upsert({
+      'blocker_id': currentUser.id,
+      'blocked_id': blockedProfileId,
+    }, onConflict: 'blocker_id,blocked_id');
+  }
+
+  /// Снимает блокировку.
+  static Future<void> unblockUser(String blockedProfileId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) throw Exception('Пользователь не авторизован');
+
+    await supabase
+        .from('blocks')
+        .delete()
+        .eq('blocker_id', currentUser.id)
+        .eq('blocked_id', blockedProfileId);
+  }
+
+  /// Проверяет, заблокировал ли текущий пользователь указанного.
+  static Future<bool> isBlocked(String profileId) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) return false;
+
+    final row = await supabase
+        .from('blocks')
+        .select()
+        .eq('blocker_id', currentUser.id)
+        .eq('blocked_id', profileId)
+        .maybeSingle();
+
+    return row != null;
   }
 
   static UserInput _profileFromRow(Map<String, dynamic> row) {

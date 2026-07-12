@@ -30,14 +30,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void initState() {
     super.initState();
     _loadHistory();
-    _channel = SupabaseService.subscribeToMessages(widget.match.id, (msg) {
-      if (!mounted) return;
-      if (msg.isMe) return;
-      setState(() {
-        widget.match.messages.add(msg);
-      });
-      _scrollToBottom();
-    });
+    _channel = SupabaseService.subscribeToMessages(
+      widget.match.id,
+      (msg) {
+        if (!mounted) return;
+        if (msg.isMe) return;
+        setState(() {
+          widget.match.messages.add(msg);
+        });
+        _scrollToBottom();
+      },
+      (deletedId) {
+        if (!mounted) return;
+        setState(() {
+          widget.match.messages.removeWhere((m) => m.id == deletedId);
+        });
+      },
+    );
   }
 
   @override
@@ -63,7 +72,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-void _scrollToBottom() {
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 300), () {
         if (_scrollController.hasClients) {
@@ -100,13 +109,14 @@ void _scrollToBottom() {
     try {
       if (image != null) {
         final imageUrl = await SupabaseService.uploadChatImage(image, widget.match.id);
-        await SupabaseService.sendMessage(
+        final id = await SupabaseService.sendMessage(
           widget.match.id,
           text.isNotEmpty ? text : null,
           imageUrl: imageUrl,
         );
         setState(() {
           widget.match.messages.add(ChatMessage(
+            id: id,
             text: text.isNotEmpty ? text : null,
             imageUrl: imageUrl,
             isMe: true,
@@ -114,9 +124,9 @@ void _scrollToBottom() {
           ));
         });
       } else {
-        await SupabaseService.sendMessage(widget.match.id, text);
+        final id = await SupabaseService.sendMessage(widget.match.id, text);
         setState(() {
-          widget.match.messages.add(ChatMessage(text: text, isMe: true, sentAt: DateTime.now()));
+          widget.match.messages.add(ChatMessage(id: id, text: text, isMe: true, sentAt: DateTime.now()));
         });
       }
       _scrollToBottom();
@@ -128,6 +138,45 @@ void _scrollToBottom() {
       }
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _deleteMessage(ChatMessage msg) async {
+    if (msg.id == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Удалить сообщение?', style: TextStyle(color: AppColors.textPrimary)),
+        content: const Text('Сообщение исчезнет у обоих собеседников.',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить', style: TextStyle(color: AppColors.dislike)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      widget.match.messages.removeWhere((m) => m.id == msg.id);
+    });
+
+    try {
+      await SupabaseService.deleteMessage(msg.id!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось удалить: $e')),
+        );
+      }
     }
   }
 
@@ -171,7 +220,7 @@ void _scrollToBottom() {
     final hasImage = msg.imageUrl != null && msg.imageUrl!.isNotEmpty;
     final hasText = msg.text != null && msg.text!.isNotEmpty;
 
-    return Align(
+    final bubble = Align(
       alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -239,6 +288,13 @@ void _scrollToBottom() {
         ),
       ),
     );
+
+    if (!msg.isMe || msg.id == null) return bubble;
+
+    return GestureDetector(
+      onLongPress: () => _deleteMessage(msg),
+      child: bubble,
+    );
   }
 
   @override
@@ -289,7 +345,7 @@ void _scrollToBottom() {
                     ? Center(
                         child: Text('Напиши первым ${widget.match.user.name} 👋',
                             style: const TextStyle(color: AppColors.textSecondary, fontSize: 15)))
-                  : ListView.builder(
+                    : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
                         reverse: true,
