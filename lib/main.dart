@@ -14,6 +14,7 @@ import 'screens/auth_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_config.dart';
 import 'supabase_service.dart';
+import 'theme.dart';
 
 const bool kShowBots = bool.fromEnvironment('SHOW_BOTS', defaultValue: false);
 
@@ -34,9 +35,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'DeepMatch',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF534AB7)),
-      ),
+      theme: buildDarkTheme(),
       home: const MainScreen(),
     );
   }
@@ -205,7 +204,7 @@ class _MainScreenState extends State<MainScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('💜 Это match! Вы с ${match.user.name} понравились друг другу'),
-          backgroundColor: const Color(0xFF534AB7),
+          backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -341,7 +340,7 @@ class _MainScreenState extends State<MainScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('💜 Это match! Вы с ${profile.name} понравились друг другу'),
-          backgroundColor: const Color(0xFF534AB7),
+          backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 5),
           shape: RoundedRectangleBorder(
@@ -403,9 +402,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF534AB7)),
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
       );
     }
@@ -429,14 +428,14 @@ class _MainScreenState extends State<MainScreen> {
     final profiles = _filteredProfiles;
 
     final exploreTab = Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.bg,
         elevation: 0,
         title: const Text(
           'Explore',
           style: TextStyle(
-            color: Color(0xFF2C2C2A),
+            color: AppColors.textPrimary,
             fontSize: 17,
             fontWeight: FontWeight.w500,
           ),
@@ -446,7 +445,7 @@ class _MainScreenState extends State<MainScreen> {
             icon: Stack(
               clipBehavior: Clip.none,
               children: [
-                const Icon(Icons.tune, color: Color(0xFF2C2C2A)),
+                const Icon(Icons.tune, color: AppColors.textPrimary),
                 if (!_filterData.isEmpty)
                   Positioned(
                     right: -2,
@@ -455,7 +454,7 @@ class _MainScreenState extends State<MainScreen> {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF534AB7),
+                        color: AppColors.primary,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -471,7 +470,6 @@ class _MainScreenState extends State<MainScreen> {
               user: profiles[_profileIndex],
               onLike: _onLike,
               onPass: _onPass,
-              onSuperLike: _onLike,
             )
           : Center(
               child: Column(
@@ -484,7 +482,7 @@ class _MainScreenState extends State<MainScreen> {
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF2C2C2A)),
+                        color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 8),
                   if (!_filterData.isEmpty)
@@ -495,7 +493,7 @@ class _MainScreenState extends State<MainScreen> {
                       }),
                       child: const Text(
                         'Сбросить фильтры',
-                        style: TextStyle(color: Color(0xFF534AB7)),
+                        style: TextStyle(color: AppColors.primary),
                       ),
                     ),
                 ],
@@ -535,8 +533,9 @@ class _MainScreenState extends State<MainScreen> {
             if (i == 2) _unreadMatches = 0;
           });
         },
-        selectedItemColor: const Color(0xFF534AB7),
-        unselectedItemColor: const Color(0xFF888780),
+        backgroundColor: AppColors.surface,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textSecondary,
         items: [
           const BottomNavigationBarItem(
             icon: Icon(Icons.explore_outlined),

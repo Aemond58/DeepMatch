@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user_input.dart';
+import '../theme.dart';
 
 class MatchScreen extends StatelessWidget {
   final UserInput myUser;
@@ -18,7 +19,7 @@ class MatchScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF534AB7),
+      backgroundColor: AppColors.primary,
       body: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -73,10 +74,10 @@ class MatchScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Написать',
                         style: TextStyle(
-                          color: Color(0xFF534AB7),
+                          color: AppColors.primary,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),

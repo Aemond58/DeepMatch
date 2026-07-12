@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/user_input.dart';
 import '../widgets/selectable_chips.dart';
 import '../theme.dart';
-import '../screens/filter_screen.dart' show appearanceOptions;
+import '../screens/filter_screen.dart' show appearanceOptions, allInterests, allTraits;
 
 class RegistrationScreen extends StatefulWidget {
   final Function(UserInput) onComplete;
@@ -50,24 +50,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     'Пока не знаю',
   ];
 
-  final List<String> _interests = [
-    'Музыка', 'Кино', 'Спорт', 'Путешествия',
-    'Готовка', 'Горы', 'Книги', 'Игры',
-    'Искусство', 'Технологии', 'Танцы', 'Йога',
-    'Фотография', 'Природа', 'Бег', 'Животные',
-  ];
-
-  final List<String> _traits = [
-    'Спокойный', 'Весёлый', 'Амбициозный', 'Добрый',
-    'Честный', 'Творческий', 'Надёжный', 'Общительный',
-    'Романтичный', 'Серьёзный', 'Заботливый', 'Независимый',
-  ];
-
-  final List<String> _partnerTraits = [
-    'Спокойный', 'Весёлый', 'Амбициозный', 'Добрый',
-    'Честный', 'Творческий', 'Надёжный', 'Общительный',
-    'Романтичный', 'Серьёзный', 'Заботливый', 'Независимый',
-  ];
+final List<String> _interests = allInterests;
+  final List<String> _traits = allTraits;
+  final List<String> _partnerTraits = allTraits;
 
   List<String> get _appearanceList => appearanceOptions(_selectedGender);
 

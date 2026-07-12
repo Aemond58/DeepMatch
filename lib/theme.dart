@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const bg = Color(0xFF0E0E1A);
-  static const surface = Color(0xFF181828);
-  static const card = Color(0xFF22223A);
-  static const primary = Color(0xFF8B83F5);
-  static const primaryDim = Color(0xFF3D3670);
-  static const textPrimary = Color(0xFFEEEEF8);
-  static const textSecondary = Color(0xFF8888AA);
-  static const border = Color(0xFF2A2A42);
+  static const bg = Color(0xFF14090C);
+  static const surface = Color(0xFF1E1114);
+  static const card = Color(0xFF2A181C);
+  static const primary = Color(0xFFE63960);
+  static const primaryDim = Color(0xFF4A1620);
+  static const textPrimary = Color(0xFFF8EEF0);
+  static const textSecondary = Color(0xFFAA8890);
+  static const border = Color(0xFF3A2226);
   static const like = Color(0xFF5EC98A);
-  static const dislike = Color(0xFFE24B4A);
-  static const superlike = Color(0xFF1D9E75);
+  static const dislike = Color(0xFFE2683F);
+  static const superlike = Color(0xFFF5B942);
   static const warning = Color(0xFFBA7517);
 }
 

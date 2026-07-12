@@ -7,7 +7,6 @@ class ProfileScreen extends StatefulWidget {
   final UserInput user;
   final VoidCallback? onLike;
   final VoidCallback? onPass;
-  final VoidCallback? onSuperLike;
   final Function(int)? onRate;
   final bool readOnly;
 
@@ -16,7 +15,6 @@ class ProfileScreen extends StatefulWidget {
     required this.user,
     this.onLike,
     this.onPass,
-    this.onSuperLike,
     this.onRate,
     this.readOnly = false,
   });
@@ -126,7 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF1E1A40), Color(0xFF0E1A30)],
+                      colors: [Color(0xFF2A181C), Color(0xFF14090C)],
                     ),
                   ),
                   child: const Center(
@@ -387,20 +385,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _ActionButton(
                       icon: Icons.close,
                       color: AppColors.dislike,
-                      size: 52,
+                      size: 60,
                       onTap: widget.onPass ?? () {}),
                   _ActionButton(
                       icon: Icons.favorite,
                       color: Colors.white,
                       backgroundColor: AppColors.primary,
-                      size: 64,
+                      size: 72,
                       onTap: widget.onLike ?? () {},
                       glow: true),
-                  _ActionButton(
-                      icon: Icons.star,
-                      color: AppColors.superlike,
-                      size: 52,
-                      onTap: widget.onSuperLike ?? () {}),
                 ],
               ),
             ),

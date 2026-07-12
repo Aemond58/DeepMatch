@@ -14,7 +14,7 @@ class OnboardingScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF0E0E1A), Color(0xFF1A1030)],
+            colors: [Color(0xFF14090C), Color(0xFF2C0E16)],
           ),
         ),
         child: SafeArea(
